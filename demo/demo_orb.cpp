@@ -23,7 +23,10 @@
 #include <opencv2/features2d.hpp>
 #include <opencv2/videoio.hpp>
 #include <opencv2/imgcodecs.hpp>
-#include "opencv2/imgproc.hpp"
+#include <opencv2/imgproc.hpp>
+
+#include <opencv2/imgproc/types_c.h>
+#include <opencv2/videoio/videoio_c.h>
 
 
 using namespace DBoW2;
