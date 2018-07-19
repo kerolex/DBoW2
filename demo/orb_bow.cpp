@@ -203,12 +203,24 @@ void testVocCreation(const vector<vector<cv::Mat> > &feats1,
 
   // lets do something with this vocabulary
   cout << "Matching images against themselves (0 low, 1 high): " << endl;
+
   BowVector v1, v2;
+  DBoW2::FeatureVector fv1, fv2;
+
+  std::map<int, int> matches12;
 
   std::string filename = "scores.dat";
   std::ofstream fPoses(filename.c_str());
   if (!fPoses.is_open()) {
     std::string msg = "Error opening file" + filename;
+    perror(msg.c_str());
+    return;
+  }
+
+  std::string filename2 = "matches.dat";
+  std::ofstream fmatches(filename2.c_str());
+  if (!fmatches.is_open()) {
+    std::string msg = "Error opening file" + filename2;
     perror(msg.c_str());
     return;
   }
@@ -222,14 +234,29 @@ void testVocCreation(const vector<vector<cv::Mat> > &feats1,
   int idx2 = -1;
 
   for (int i = 0; i < nFeats1; i++) {
-    mpVocabulary->transform(feats1[i], v1);
+
+    cv::Mat D1;
+    changeStructure(feats1[i], D1);
+    mpVocabulary->transform(feats1[i], v1, fv1, 4);
+
     for (int j = 0; j < nFeats2; j++) {
-      mpVocabulary->transform(feats2[j], v2);
+
+      matches12.clear();
+
+      cv::Mat D2;
+      changeStructure(feats2[j], D2);
+      mpVocabulary->transform(feats2[j], v2, fv2, 4);
 
       double score = mpVocabulary->score(v1, v2);
-      cout << "Image " << i << " vs Image " << j << ": " << score << endl;
+
+      int num_matches = SearchByBoW(D1, D2, fv1, fv2, matches12, DESC_TH,
+                                    LOWE_RATIO);
+
+      cout << "Image " << i << " vs Image " << j << ": " << score
+          << " ( # matches = " << num_matches << ")" << endl;
 
       fPoses << std::setprecision(5) << std::setw(5) << score << "\t";
+      fmatches << std::setw(5) << num_matches << "\t";
 
       if (i != j && score > best_score) {
         idx1 = i;
@@ -238,25 +265,25 @@ void testVocCreation(const vector<vector<cv::Mat> > &feats1,
       }
     }
     fPoses << "\n";
+    fmatches << "\n";
   }
 
   fPoses.close();
-
-
-  std::map<int, int> matches12;
+  fmatches.close();
 
   cv::Mat desc1, desc2;
   changeStructure(feats1[idx1], desc1);
   changeStructure(feats2[idx2], desc2);
 
-  mpVocabulary->transform(feats1[idx1], v1);
-  mpVocabulary->transform(feats2[idx2], v2);
+  mpVocabulary->transform(feats1[idx1], v1, fv1, 4);
+  mpVocabulary->transform(feats2[idx2], v2, fv2, 4);
 
-  int num_matches = SearchByBoW(desc1, desc2, v1, v2, matches12, DESC_TH,
+  int num_matches = SearchByBoW(desc1, desc2, fv1, fv2, matches12, DESC_TH,
                                 LOWE_RATIO);
 
   std::cout << "The number of matches between image #" << idx1 << " and image #"
-      << idx2 << " is " << num_matches << std::endl;
+      << idx2 << " (score = " << best_score << ") is " << num_matches
+      << std::endl;
 
   // TODO: visualise matches
 
