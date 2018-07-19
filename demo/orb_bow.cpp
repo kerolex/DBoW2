@@ -34,15 +34,57 @@ using namespace DUtils;
 using namespace std;
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+const int DESC_TH = 50;
+const float LOWE_RATIO = 0.8;
+
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 void loadFeatures(vector<vector<cv::Mat> > &features, std::string videopath);
+
+/**
+ *
+ */
 void changeStructure(const cv::Mat &plain, vector<cv::Mat> &out);
+
+// @Override
+void changeStructure(const vector<cv::Mat> &plain_vec, cv::Mat& out);
+
+
 //void testVocCreation(const vector<vector<cv::Mat > > &features);
 void testDatabase(const vector<vector<cv::Mat> > &features);
 
 void testVocCreation(const vector<vector<cv::Mat> > &feats1,
                      const vector<vector<cv::Mat> > &feats2,
                      std::string strVocFile);
+
+/**
+ * @fn
+ *
+ * @brief
+ *
+ * Features are matched using the fast BoW approach and the nearest neighbour
+ * with distance ratio to remove ambiguities and minimum threshold
+ */
+int SearchByBoW(const cv::Mat& desc1, const cv::Mat& desc2,
+                const DBoW2::FeatureVector &vFeatVec1,
+                const DBoW2::FeatureVector &vFeatVec2,
+                std::map<int, int>& matches12, const int& desc_th,
+                const float& lowe_ratio);
+
+/**
+ * @fn DescriptorDistance
+ *
+ * Bit set count operation from
+ * http://graphics.stanford.edu/~seander/bithacks.html#CountBitsSetParallel
+ *
+ * @param a First ORB descriptor whose dimension is 32 bytes (i.e. 32 elements
+ * of uchar values)
+ * @param a Second ORB descriptor whose dimension is 32 bytes (i.e. 32 elements
+ * of uchar values)
+ */
+int DescriptorDistance(const cv::Mat &a, const cv::Mat &b);
+
+
 
 typedef DBoW2::TemplatedVocabulary<DBoW2::FORB::TDescriptor, DBoW2::FORB> ORBVocabulary;
 
@@ -130,6 +172,15 @@ void changeStructure(const cv::Mat &plain, vector<cv::Mat> &out) {
   }
 }
 
+void changeStructure(const vector<cv::Mat> &plain_vec, cv::Mat& out) {
+
+  out.release();
+
+  for (size_t i = 0; i < plain_vec.size(); ++i) {
+    out.push_back(plain_vec[i].clone());
+  }
+}
+
 // ----------------------------------------------------------------------------
 
 void testVocCreation(const vector<vector<cv::Mat> > &feats1,
@@ -165,6 +216,11 @@ void testVocCreation(const vector<vector<cv::Mat> > &feats1,
   int nFeats1 = (int) feats1.size();
   int nFeats2 = (int) feats2.size();
 
+  double best_score = 0;
+
+  int idx1 = -1;
+  int idx2 = -1;
+
   for (int i = 0; i < nFeats1; i++) {
     mpVocabulary->transform(feats1[i], v1);
     for (int j = 0; j < nFeats2; j++) {
@@ -174,12 +230,120 @@ void testVocCreation(const vector<vector<cv::Mat> > &feats1,
       cout << "Image " << i << " vs Image " << j << ": " << score << endl;
 
       fPoses << std::setprecision(5) << std::setw(5) << score << "\t";
+
+      if (i != j && score > best_score) {
+        idx1 = i;
+        idx2 = j;
+        best_score = score;
+      }
     }
     fPoses << "\n";
   }
 
   fPoses.close();
 
+
+  std::map<int, int> matches12;
+
+  cv::Mat desc1, desc2;
+  changeStructure(feats1[idx1], desc1);
+  changeStructure(feats2[idx2], desc2);
+
+  mpVocabulary->transform(feats1[idx1], v1);
+  mpVocabulary->transform(feats2[idx2], v2);
+
+  int num_matches = SearchByBoW(desc1, desc2, v1, v2, matches12, DESC_TH,
+                                LOWE_RATIO);
+
+  std::cout << "The number of matches between image #" << idx1 << " and image #"
+      << idx2 << " is " << num_matches << std::endl;
+
+  // TODO: visualise matches
+
   cout << "Done" << endl;
+}
+
+
+// Features are matched using the fast BoW approach and the nearest neighbour
+// with distance ratio to remove ambiguities and minimum threshold
+int SearchByBoW(const cv::Mat& desc1, const cv::Mat& desc2,
+                const DBoW2::FeatureVector &vFeatVec1,
+                const DBoW2::FeatureVector &vFeatVec2,
+                std::map<int, int>& matches12, const int& desc_th,
+                const float& lowe_ratio) {
+
+  matches12.clear();
+
+  int nmatches = 0;  // number of matches
+
+  DBoW2::FeatureVector::const_iterator f1it = vFeatVec1.begin();
+  DBoW2::FeatureVector::const_iterator f2it = vFeatVec2.begin();
+  DBoW2::FeatureVector::const_iterator f1end = vFeatVec1.end();
+  DBoW2::FeatureVector::const_iterator f2end = vFeatVec2.end();
+
+  while (f1it != f1end && f2it != f2end) {
+    if (f1it->first == f2it->first) {
+      for (size_t i1 = 0, iend1 = f1it->second.size(); i1 < iend1; i1++) {
+        const size_t idx1 = f1it->second[i1];
+
+        const cv::Mat &d1 = desc1.row(idx1);
+
+        int bestDist1 = 256;
+        int bestIdx2 = -1;
+        int bestDist2 = 256;
+
+        for (size_t i2 = 0, iend2 = f2it->second.size(); i2 < iend2; i2++) {
+          const size_t idx2 = f2it->second[i2];
+
+          const cv::Mat &d2 = desc2.row(idx2);
+
+          int dist = DescriptorDistance(d1, d2);
+
+          if (dist < bestDist1) {
+            bestDist2 = bestDist1;
+            bestDist1 = dist;
+            bestIdx2 = idx2;
+          } else if (dist < bestDist2) {
+            bestDist2 = dist;
+          }
+        }
+
+        if (bestDist1 < desc_th) {
+          if (static_cast<float>(bestDist1)
+              < lowe_ratio * static_cast<float>(bestDist2)) {
+            matches12[idx1] = bestIdx2;
+            nmatches++;
+          }
+        }
+      }
+
+      f1it++;
+      f2it++;
+    } else if (f1it->first < f2it->first) {
+      f1it = vFeatVec1.lower_bound(f2it->first);
+    } else {
+      f2it = vFeatVec2.lower_bound(f1it->first);
+    }
+  }
+
+  return nmatches;
+}
+
+
+//
+int DescriptorDistance(const cv::Mat &a, const cv::Mat &b) {
+  const int *pa = a.ptr<int32_t>();
+  const int *pb = b.ptr<int32_t>();
+
+  int dist = 0;
+
+  for (int i = 0; i < 8; i++, pa++, pb++) {
+    unsigned int v = *pa ^ *pb;
+    v = v - ((v >> 1) & 0x55555555);
+    v = (v & 0x33333333) + ((v >> 2) & 0x33333333);
+    dist += (((v + (v >> 4)) & 0xF0F0F0F) * 0x1010101) >> 24;
+  }
+
+  return dist;
 }
 
