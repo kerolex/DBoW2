@@ -3,7 +3,9 @@ project(DBoW2)
 include(ExternalProject)
 
 option(BUILD_DBoW2   "Build DBoW2"            ON)
-option(BUILD_Demo    "Build demo application" ON)
+option(BUILD_Demo    "Build demo application" OFF)
+option(BUILD_Demo_ORB    "Build demo application" ON)
+option(BUILD_MyPlaceRecognizer    "Build MyPlaceRecognizer application" OFF)
 
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build." FORCE)
@@ -22,23 +24,25 @@ elseif(CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_GNUCXX)
 endif()
 
 set(HDRS
-  include/DBoW2/BowVector.h           include/DBoW2/FBrief.h
+  include/DBoW2/BowVector.h           include/DBoW2/FBrief.h              include/DBoW2/FSurf64.h
   include/DBoW2/QueryResults.h        include/DBoW2/TemplatedDatabase.h   include/DBoW2/FORB.h
   include/DBoW2/DBoW2.h               include/DBoW2/FClass.h              include/DBoW2/FeatureVector.h
   include/DBoW2/ScoringObject.h       include/DBoW2/TemplatedVocabulary.h)
 set(SRCS 
-  src/BowVector.cpp     src/FBrief.cpp        src/FORB.cpp
+  src/BowVector.cpp     src/FBrief.cpp        src/FSurf64.cpp       src/FORB.cpp
   src/FeatureVector.cpp src/QueryResults.cpp  src/ScoringObject.cpp)
 
 set(DEPENDENCY_DIR ${CMAKE_CURRENT_BINARY_DIR}/dependencies)
 set(DEPENDENCY_INSTALL_DIR ${DEPENDENCY_DIR}/install)
 
-find_package(OpenCV REQUIRED)
+set(OpenCV_DIR "/usr/local/opencv/opencv-4.1.0/")
+find_package(OpenCV REQUIRED PATHS ${OpenCV_DIR} NO_DEFAULT_PATH)
 include_directories(${OpenCV_INCLUDE_DIRS})
 
 find_package(Boost REQUIRED)
 include_directories(${Boost_INCLUDE_DIR})
 
+set(DLib_DIR "")
 find_package(DLib QUIET 
   PATHS ${DEPENDENCY_INSTALL_DIR})
 if(${DLib_FOUND})
@@ -52,7 +56,7 @@ else(${DLib_FOUND})
     ExternalProject_Add(DLib
       PREFIX ${DEPENDENCY_DIR}
       GIT_REPOSITORY http://github.com/dorian3d/DLib
-      GIT_TAG master
+      GIT_TAG v1.1-nonfree
       INSTALL_DIR ${DEPENDENCY_INSTALL_DIR}
       CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>)
     add_custom_target(Dependencies ${CMAKE_COMMAND} ${CMAKE_SOURCE_DIR} DEPENDS DLib)
@@ -73,6 +77,18 @@ if(BUILD_Demo)
   target_link_libraries(demo ${PROJECT_NAME} ${OpenCV_LIBS} ${DLib_LIBS})
   file(COPY demo/images DESTINATION ${CMAKE_BINARY_DIR}/)
 endif(BUILD_Demo)
+
+if(BUILD_Demo_ORB)
+  add_executable(demo_orb demo/demo_orb.cpp)
+  target_link_libraries(demo_orb ${PROJECT_NAME} ${OpenCV_LIBS} ${DLib_LIBS})
+  file(COPY demo/images DESTINATION ${CMAKE_BINARY_DIR}/)
+endif(BUILD_Demo_ORB)
+
+if(BUILD_MyPlaceRecognizer)
+  add_executable(myPlaceRecognizer demo/testORB.cpp)
+  target_link_libraries(myPlaceRecognizer ${PROJECT_NAME} ${OpenCV_LIBS} ${DLib_LIBS})
+  file(COPY demo/images DESTINATION ${CMAKE_BINARY_DIR}/)
+endif(BUILD_MyPlaceRecognizer)
 
 configure_file(src/DBoW2.cmake.in
   "${PROJECT_BINARY_DIR}/DBoW2Config.cmake" @ONLY)

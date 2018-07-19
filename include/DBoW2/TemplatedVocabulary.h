@@ -223,6 +223,12 @@ public:
    * @param type new scoring type
    */
   void setScoringType(ScoringType type);
+
+  /**
+   * Loads the vocabulary from a text file
+   * @param filename
+   */
+  bool loadFromTextFile(const std::string &filename);
   
   /**
    * Saves the vocabulary into a file
@@ -1522,6 +1528,97 @@ std::ostream& operator<<(std::ostream &os,
   os << ", Number of words = " << voc.size();
 
   return os;
+}
+
+// --------------------------------------------------------------------------
+
+template<class TDescriptor, class F>
+bool TemplatedVocabulary<TDescriptor,F>::loadFromTextFile(const std::string &filename)
+{
+    std::ifstream f;
+    f.open(filename.c_str());
+	
+    if(f.eof()) { return false; }
+
+    m_words.clear();
+    m_nodes.clear();
+
+    std::string s;
+    getline(f,s);
+    std::stringstream ss;
+    ss << s;
+    ss >> m_k;
+    ss >> m_L;
+    int n1, n2;
+    ss >> n1;
+    ss >> n2;
+
+    if(m_k<0 || m_k>20 || m_L<1 || m_L>10 || n1<0 || n1>5 || n2<0 || n2>3)
+    {
+      std::cerr << "Vocabulary loading failure: This is not a correct text file!" << std::endl;
+      return false;
+    }
+    
+    m_scoring = (ScoringType)n1;
+    m_weighting = (WeightingType)n2;
+    createScoringObject();
+
+    // nodes
+    int expected_nodes =
+    (int)((pow((double)m_k, (double)m_L + 1) - 1)/(m_k - 1));
+    m_nodes.reserve(expected_nodes);
+
+    m_words.reserve(pow((double)m_k, (double)m_L + 1));
+
+    m_nodes.resize(1);
+    m_nodes[0].id = 0;
+    while(!f.eof())
+    {
+        std::string snode;
+        getline(f,snode);
+        std::stringstream ssnode;
+        ssnode << snode;
+
+        int nid = m_nodes.size();
+        m_nodes.resize(m_nodes.size()+1);
+        m_nodes[nid].id = nid;
+	
+        int pid ;
+        ssnode >> pid;
+        m_nodes[nid].parent = pid;
+        m_nodes[pid].children.push_back(nid);
+
+        int nIsLeaf;
+        ssnode >> nIsLeaf;
+
+        std::stringstream ssd;
+        for(int iD=0;iD<F::L;iD++)
+        {
+            std::string sElement;
+            ssnode >> sElement;
+            ssd << sElement << " ";
+        }
+        
+        F::fromString(m_nodes[nid].descriptor, ssd.str());
+
+        ssnode >> m_nodes[nid].weight;
+
+        if(nIsLeaf>0)
+        {
+            int wid = m_words.size();
+            m_words.resize(wid+1);
+
+            m_nodes[nid].word_id = wid;
+            m_words[wid] = &m_nodes[nid];
+        }
+        else
+        {
+            m_nodes[nid].children.reserve(m_k);
+        }
+    }
+
+    return true;
+
 }
 
 } // namespace DBoW2
