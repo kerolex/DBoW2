@@ -35,7 +35,7 @@ set(SRCS
 set(DEPENDENCY_DIR ${CMAKE_CURRENT_BINARY_DIR}/dependencies)
 set(DEPENDENCY_INSTALL_DIR ${DEPENDENCY_DIR}/install)
 
-set(OpenCV_DIR "/usr/local/opencv/opencv-4.1.0/")
+set(OpenCV_DIR "/usr/local/opencv/opencv-3.4.1/")
 find_package(OpenCV REQUIRED PATHS ${OpenCV_DIR} NO_DEFAULT_PATH)
 include_directories(${OpenCV_INCLUDE_DIRS})
 
@@ -79,7 +79,7 @@ if(BUILD_Demo)
 endif(BUILD_Demo)
 
 if(BUILD_Demo_ORB)
-  add_executable(demo_orb demo/demo_orb.cpp)
+  add_executable(demo_orb demo/orb_bow.cpp)
   target_link_libraries(demo_orb ${PROJECT_NAME} ${OpenCV_LIBS} ${DLib_LIBS})
   file(COPY demo/images DESTINATION ${CMAKE_BINARY_DIR}/)
 endif(BUILD_Demo_ORB)

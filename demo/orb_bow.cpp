@@ -130,7 +130,7 @@ void loadFeatures(vector<vector<cv::Mat> > &features, std::string videopath) {
   features.clear();
   features.reserve(nFrames);
 
-  cv::Ptr < cv::ORB > orb = cv::ORB::create();
+  cv::Ptr < cv::ORB > orb = cv::ORB::create(2000);
 
   cout << "Extracting ORB features..." << endl;
   for (int i = 0; i < nFrames; ++i) {
@@ -224,6 +224,14 @@ void testVocCreation(const vector<vector<cv::Mat> > &feats1,
     perror(msg.c_str());
     return;
   }
+  
+    std::string filename3 = "matches_normalised.dat";
+  std::ofstream fmatchesnorm(filename3.c_str());
+  if (!fmatchesnorm.is_open()) {
+    std::string msg = "Error opening file" + filename3;
+    perror(msg.c_str());
+    return;
+  }
 
   int nFeats1 = (int) feats1.size();
   int nFeats2 = (int) feats2.size();
@@ -247,6 +255,9 @@ void testVocCreation(const vector<vector<cv::Mat> > &feats1,
       changeStructure(feats2[j], D2);
       mpVocabulary->transform(feats2[j], v2, fv2, 4);
 
+      std::cout << "# features in first image: " << D1.rows << std::endl;
+      std::cout << "# features in second image: " << D2.rows << std::endl;
+
       double score = mpVocabulary->score(v1, v2);
 
       int num_matches = SearchByBoW(D1, D2, fv1, fv2, matches12, DESC_TH,
@@ -257,6 +268,7 @@ void testVocCreation(const vector<vector<cv::Mat> > &feats1,
 
       fPoses << std::setprecision(5) << std::setw(5) << score << "\t";
       fmatches << std::setw(5) << num_matches << "\t";
+            fmatchesnorm << std::setprecision(5) << std::setw(5) << num_matches / (float)min(D1.rows, D2.rows) << "\t";
 
       if (i != j && score > best_score) {
         idx1 = i;
@@ -266,10 +278,12 @@ void testVocCreation(const vector<vector<cv::Mat> > &feats1,
     }
     fPoses << "\n";
     fmatches << "\n";
+    fmatchesnorm << "\n";
   }
 
   fPoses.close();
   fmatches.close();
+  fmatchesnorm.close();
 
   cv::Mat desc1, desc2;
   changeStructure(feats1[idx1], desc1);
