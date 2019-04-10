@@ -18,12 +18,13 @@
 #include <DVision/DVision.h>
 
 // OpenCV
-#include <opencv2/core.hpp>
-#include <opencv2/highgui.hpp>
-#include <opencv2/features2d.hpp>
-#include <opencv2/videoio.hpp>
-#include <opencv2/imgcodecs.hpp>
-#include <opencv2/imgproc.hpp>
+#include <opencv2/opencv.hpp>
+//#include <opencv2/core.hpp>
+//#include <opencv2/highgui.hpp>
+//#include <opencv2/features2d.hpp>
+//#include <opencv2/videoio.hpp>
+//#include <opencv2/imgcodecs.hpp>
+//#include <opencv2/imgproc.hpp>
 
 // Compatibility with OpenCV < 3.4
 #include <opencv2/imgproc/types_c.h>
@@ -98,10 +99,20 @@ void wait() {
 // ----------------------------------------------------------------------------
 
 int main(int argc, char* argv[]) {
+  if (argc != 4) {
+    return EXIT_FAILURE;
+  }
+  
   /// Parse input parameters
   std::string videopath1 = argv[1];
+  std::cout << videopath1 << std::endl;
+  
   std::string videopath2 = argv[2];
+  std::cout << videopath2 << std::endl;
+  
   std::string strVocFile = argv[3];
+  std::cout << strVocFile << std::endl;
+  
 
   vector < vector<cv::Mat> > feats1;
   loadFeatures(feats1, videopath1);
