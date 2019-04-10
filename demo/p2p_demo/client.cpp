@@ -30,6 +30,8 @@
 //#include <opencv2/imgproc/types_c.h>
 //#include <opencv2/videoio/videoio_c.h>
 
+#include <zmq.h>
+
 using namespace DBoW2;
 using namespace DUtils;
 using namespace std;
@@ -99,28 +101,63 @@ void wait() {
 // ----------------------------------------------------------------------------
 
 int main(int argc, char* argv[]) {
-  if (argc != 4) {
+
+  /// Parse input parameters
+  std::string videopath = argv[1];
+  std::string strVocFile = argv[3];
+
+  printf ("Connecting to server…\n");
+  void *context = zmq_ctx_new ();
+  void *requester = zmq_socket (context, ZMQ_REQ);
+  zmq_connect (requester, "tcp://localhost:5555");
+
+  cv::VideoCapture cam1(videopath + "%06d.png");
+
+  if (!cam1.isOpened()) {
     return EXIT_FAILURE;
   }
-  
-  /// Parse input parameters
-  std::string videopath1 = argv[1];
-  std::cout << videopath1 << std::endl;
-  
-  std::string videopath2 = argv[2];
-  std::cout << videopath2 << std::endl;
-  
-  std::string strVocFile = argv[3];
-  std::cout << strVocFile << std::endl;
-  
 
-  vector < vector<cv::Mat> > feats1;
-  loadFeatures(feats1, videopath1);
+  int nFrames = cam1.get(CV_CAP_PROP_FRAME_COUNT);
 
-  vector < vector<cv::Mat> > feats2;
-  loadFeatures(feats2, videopath2);
+  cv::Ptr < cv::ORB > orb = cv::ORB::create(2000);
+  vector < vector<cv::Mat> > feats;
 
-  testVocCreation(feats1, feats2, strVocFile);
+  for (int i = 0; i < nFrames; ++i) {
+    cv::Mat rgb_img;
+    cam1 >> rgb_img;  // Get a new frame from the video
+
+    if (rgb_img.empty()) {
+      std::cerr << "!!! Failed imread(): image not found !!!" << std::endl;
+      return EXIT_FAILURE;
+    }
+
+    // Convert RGB to gray image
+    cv::Mat mImGray = rgb_img;
+    if (mImGray.channels() == 3) {
+      cvtColor(mImGray, mImGray, CV_RGB2GRAY);
+    }
+
+    cv::Mat mask;
+    vector<cv::KeyPoint> keypoints;
+    cv::Mat descriptors;
+
+    orb->detectAndCompute(mImGray, mask, keypoints, descriptors);
+
+    feats.push_back(vector<cv::Mat>());
+    changeStructure(descriptors, feats.back());
+
+    printf ("Client: Sending frame #%d…\n", i);
+    zmq_send (requester, "Hello", 5, 0);
+  }
+
+  // Process frames
+  //vector < vector<cv::Mat> > feats;
+  //loadFeatures(feats, videopath);
+
+  testVocCreation(feats, feats, strVocFile);
+
+  zmq_close (requester);
+  zmq_ctx_destroy (context);
 
   std::cout << "Finished!" << std::endl;
 

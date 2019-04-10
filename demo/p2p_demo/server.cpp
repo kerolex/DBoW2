@@ -99,20 +99,10 @@ void wait() {
 // ----------------------------------------------------------------------------
 
 int main(int argc, char* argv[]) {
-  if (argc != 4) {
-    return EXIT_FAILURE;
-  }
-  
   /// Parse input parameters
   std::string videopath1 = argv[1];
-  std::cout << videopath1 << std::endl;
-  
   std::string videopath2 = argv[2];
-  std::cout << videopath2 << std::endl;
-  
   std::string strVocFile = argv[3];
-  std::cout << strVocFile << std::endl;
-  
 
   vector < vector<cv::Mat> > feats1;
   loadFeatures(feats1, videopath1);

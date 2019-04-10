@@ -18,17 +18,16 @@
 #include <DVision/DVision.h>
 
 // OpenCV
-#include <opencv2/opencv.hpp>
-//#include <opencv2/core.hpp>
-//#include <opencv2/highgui.hpp>
-//#include <opencv2/features2d.hpp>
-//#include <opencv2/videoio.hpp>
-//#include <opencv2/imgcodecs.hpp>
-//#include <opencv2/imgproc.hpp>
+#include <opencv2/core.hpp>
+#include <opencv2/highgui.hpp>
+#include <opencv2/features2d.hpp>
+#include <opencv2/videoio.hpp>
+#include <opencv2/imgcodecs.hpp>
+#include <opencv2/imgproc.hpp>
 
 // Compatibility with OpenCV < 3.4
-//#include <opencv2/imgproc/types_c.h>
-//#include <opencv2/videoio/videoio_c.h>
+#include <opencv2/imgproc/types_c.h>
+#include <opencv2/videoio/videoio_c.h>
 
 using namespace DBoW2;
 using namespace DUtils;
@@ -99,21 +98,31 @@ void wait() {
 // ----------------------------------------------------------------------------
 
 int main(int argc, char* argv[]) {
-  if (argc != 4) {
-    return EXIT_FAILURE;
-  }
-  
   /// Parse input parameters
   std::string videopath1 = argv[1];
-  std::cout << videopath1 << std::endl;
-  
   std::string videopath2 = argv[2];
-  std::cout << videopath2 << std::endl;
-  
   std::string strVocFile = argv[3];
-  std::cout << strVocFile << std::endl;
-  
 
+
+	std::vector<std::string> sequences = {'i_ajuntament', 'i_bologna', 'i_books', 'i_bridger', 'i_chestnuts', 'i_dome', ' i_duda', 
+'i_leuven', 'i_londonbridge', 'i_miniature', 'i_nescafe', 'i_partyfood', 'i_pinard', 'i_pool', 'i_salon',
+'i_santuario', 'i_steps', 'i_zion'};
+	
+	std:vector<std::string> methods = {'HLight', 'HLight-HE-C', 
+		'HLight-LightRSR-10', 'HLight-LightRSR-diag', 
+		'HLight-LightRSR-diag-2', 'HLight-LightRSR-diag-4', 
+		'HLight-LightRSR-diag-16', 'HLight-LightRSR-diag-64', 
+		'HLight-STAR'};
+
+ for (int j=2; j<6; ++j) {
+	cv::Mat scores();
+	
+	for (int d=0; d<sequences.size(); ++d) {
+		for (int m=0; m<methods.size(); ++m) {
+		
+		}
+	}  
+ }
   vector < vector<cv::Mat> > feats1;
   loadFeatures(feats1, videopath1);
 

@@ -35,13 +35,24 @@ set(SRCS
 set(DEPENDENCY_DIR ${CMAKE_CURRENT_BINARY_DIR}/dependencies)
 set(DEPENDENCY_INSTALL_DIR ${DEPENDENCY_DIR}/install)
 
-set(OpenCV_DIR "/usr/local/opencv/opencv-3.4.1/")
+################################################################################
+# OpenCV
+set(OpenCV_DIR "/usr/local/opencv/opencv3.4.1")
 find_package(OpenCV REQUIRED PATHS ${OpenCV_DIR} NO_DEFAULT_PATH)
-include_directories(${OpenCV_INCLUDE_DIRS})
 
+if(NOT OpenCV_FOUND)
+   message(FATAL_ERROR "OpenCV > 3.x not found.")
+else()
+	message(STATUS "OpenCV found.")
+endif()
+
+include_directories(${OpenCV_INCLUDE_DIRS})
+#
+# Boost
 find_package(Boost REQUIRED)
 include_directories(${Boost_INCLUDE_DIR})
-
+#
+# DLib
 set(DLib_DIR "")
 find_package(DLib QUIET 
   PATHS ${DEPENDENCY_INSTALL_DIR})
@@ -64,7 +75,9 @@ else(${DLib_FOUND})
     message(SEND_ERROR "Please, activate DOWNLOAD_DLib_dependency option or download manually")
   endif(${DOWNLOAD_DLib_dependency})
 endif(${DLib_FOUND})
-
+#
+#
+################################################################################
 if(BUILD_DBoW2)
   add_library(${PROJECT_NAME} SHARED ${SRCS})
   include_directories(include/DBoW2/)
