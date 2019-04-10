@@ -6,29 +6,24 @@
  * License: see the LICENSE.txt file
  */
 
+#include <cassert>
 #include <iostream>
 #include <vector>
 #include <iomanip>
 #include <string>
+#include <thread>
 
 // DBoW2
-#include "DBoW2.h" // defines OrbVocabulary and OrbDatabase
+#include <DBoW2.h> // defines OrbVocabulary and OrbDatabase
 
+// DLib
 #include <DUtils/DUtils.h>
 #include <DVision/DVision.h>
 
 // OpenCV
 #include <opencv2/opencv.hpp>
-//#include <opencv2/core.hpp>
-//#include <opencv2/highgui.hpp>
-//#include <opencv2/features2d.hpp>
-//#include <opencv2/videoio.hpp>
-//#include <opencv2/imgcodecs.hpp>
-//#include <opencv2/imgproc.hpp>
 
-// Compatibility with OpenCV < 3.4
-//#include <opencv2/imgproc/types_c.h>
-//#include <opencv2/videoio/videoio_c.h>
+#include <zmq.h>
 
 using namespace DBoW2;
 using namespace DUtils;
@@ -50,13 +45,7 @@ void changeStructure(const cv::Mat &plain, vector<cv::Mat> &out);
 // @Override
 void changeStructure(const vector<cv::Mat> &plain_vec, cv::Mat& out);
 
-
-//void testVocCreation(const vector<vector<cv::Mat > > &features);
-void testDatabase(const vector<vector<cv::Mat> > &features);
-
-void testVocCreation(const vector<vector<cv::Mat> > &feats1,
-                     const vector<vector<cv::Mat> > &feats2,
-                     std::string strVocFile);
+void testVocCreation(const vector<vector<cv::Mat> > &feats1);
 
 /**
  * @fn
@@ -89,6 +78,23 @@ int DescriptorDistance(const cv::Mat &a, const cv::Mat &b);
 
 typedef DBoW2::TemplatedVocabulary<DBoW2::FORB::TDescriptor, DBoW2::FORB> ORBVocabulary;
 
+
+void listener() {
+  //  Socket to talk to clients
+  void *context = zmq_ctx_new();
+  void *responder = zmq_socket(context, ZMQ_REP);
+  int rc = zmq_bind(responder, "tcp://*:5555");
+  assert(rc == 0);
+
+  while (1) {
+    char buffer[10];
+    zmq_recv(responder, buffer, 10, 0);
+    printf("Server: Received Hello\n");
+    sleep(1);          //  Do some 'work'
+    zmq_send(responder, "World", 5, 0);
+  }
+}
+
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 void wait() {
@@ -99,18 +105,30 @@ void wait() {
 // ----------------------------------------------------------------------------
 
 int main(int argc, char* argv[]) {
+  std::thread* ptListener = new thread(&listener);
+
+  //Load ORB Vocabulary from disk (ORB-SLAM learnt vocabulary)
+  cout << endl << "Loading ORB Vocabulary. This could take a while..." << endl;
+  std::string strVocFile = argv[2];
+  ORBVocabulary* mpVocabulary = new ORBVocabulary();
+
+  bool bVocLoad = mpVocabulary->loadFromTextFile(strVocFile);
+  if (!bVocLoad) {
+    cerr << "Wrong path to vocabulary. " << endl;
+    cerr << "Falied to open at: " << strVocFile << endl;
+    exit(-1);
+  }
+  cout << "Vocabulary loaded!" << endl << endl;
+  cout << "Vocabulary information: " << endl << &mpVocabulary << endl << endl;
+
   /// Parse input parameters
-  std::string videopath1 = argv[1];
-  std::string videopath2 = argv[2];
-  std::string strVocFile = argv[3];
+  std::string videopath = argv[1];
+  vector < vector<cv::Mat> > feats;
+  loadFeatures(feats, videopath);
 
-  vector < vector<cv::Mat> > feats1;
-  loadFeatures(feats1, videopath1);
+  testVocCreation(feats1);
 
-  vector < vector<cv::Mat> > feats2;
-  loadFeatures(feats2, videopath2);
 
-  testVocCreation(feats1, feats2, strVocFile);
 
   std::cout << "Finished!" << std::endl;
 
@@ -184,123 +202,22 @@ void changeStructure(const vector<cv::Mat> &plain_vec, cv::Mat& out) {
 
 // ----------------------------------------------------------------------------
 
-void testVocCreation(const vector<vector<cv::Mat> > &feats1,
-                     const vector<vector<cv::Mat> > &feats2,
-                     std::string strVocFile) {
-  //Load ORB Vocabulary from disk (ORB-SLAM learnt vocabulary)
-  cout << endl << "Loading ORB Vocabulary. This could take a while..." << endl;
-
-  ORBVocabulary* mpVocabulary = new ORBVocabulary();
-
-  bool bVocLoad = mpVocabulary->loadFromTextFile(strVocFile);
-  if (!bVocLoad) {
-    cerr << "Wrong path to vocabulary. " << endl;
-    cerr << "Falied to open at: " << strVocFile << endl;
-    exit(-1);
-  }
-  cout << "Vocabulary loaded!" << endl << endl;
-
-  cout << "Vocabulary information: " << endl << &mpVocabulary << endl << endl;
-
+void testVocCreation(const vector<vector<cv::Mat> > &feats1) {
   // lets do something with this vocabulary
   cout << "Matching images against themselves (0 low, 1 high): " << endl;
 
-  BowVector v1, v2;
-  DBoW2::FeatureVector fv1, fv2;
-
-  std::map<int, int> matches12;
-
-  std::string filename = "scores.dat";
-  std::ofstream fPoses(filename.c_str());
-  if (!fPoses.is_open()) {
-    std::string msg = "Error opening file" + filename;
-    perror(msg.c_str());
-    return;
-  }
-
-  std::string filename2 = "matches.dat";
-  std::ofstream fmatches(filename2.c_str());
-  if (!fmatches.is_open()) {
-    std::string msg = "Error opening file" + filename2;
-    perror(msg.c_str());
-    return;
-  }
-  
-    std::string filename3 = "matches_normalised.dat";
-  std::ofstream fmatchesnorm(filename3.c_str());
-  if (!fmatchesnorm.is_open()) {
-    std::string msg = "Error opening file" + filename3;
-    perror(msg.c_str());
-    return;
-  }
+  BowVector v1;
+  DBoW2::FeatureVector fv1;
 
   int nFeats1 = (int) feats1.size();
-  int nFeats2 = (int) feats2.size();
-
-  double best_score = 0;
-
-  int idx1 = -1;
-  int idx2 = -1;
 
   for (int i = 0; i < nFeats1; i++) {
-
     cv::Mat D1;
     changeStructure(feats1[i], D1);
     mpVocabulary->transform(feats1[i], v1, fv1, 4);
 
-    for (int j = 0; j < nFeats2; j++) {
-
-      matches12.clear();
-
-      cv::Mat D2;
-      changeStructure(feats2[j], D2);
-      mpVocabulary->transform(feats2[j], v2, fv2, 4);
-
-      std::cout << "# features in first image: " << D1.rows << std::endl;
-      std::cout << "# features in second image: " << D2.rows << std::endl;
-
-      double score = mpVocabulary->score(v1, v2);
-
-      int num_matches = SearchByBoW(D1, D2, fv1, fv2, matches12, DESC_TH,
-                                    LOWE_RATIO);
-
-      cout << "Image " << i << " vs Image " << j << ": " << score
-          << " ( # matches = " << num_matches << ")" << endl;
-
-      fPoses << std::setprecision(5) << std::setw(5) << score << "\t";
-      fmatches << std::setw(5) << num_matches << "\t";
-            fmatchesnorm << std::setprecision(5) << std::setw(5) << num_matches / (float)min(D1.rows, D2.rows) << "\t";
-
-      if (i != j && score > best_score) {
-        idx1 = i;
-        idx2 = j;
-        best_score = score;
-      }
-    }
-    fPoses << "\n";
-    fmatches << "\n";
-    fmatchesnorm << "\n";
+    std::cout << "# features in first image: " << D1.rows << std::endl;
   }
-
-  fPoses.close();
-  fmatches.close();
-  fmatchesnorm.close();
-
-  cv::Mat desc1, desc2;
-  changeStructure(feats1[idx1], desc1);
-  changeStructure(feats2[idx2], desc2);
-
-  mpVocabulary->transform(feats1[idx1], v1, fv1, 4);
-  mpVocabulary->transform(feats2[idx2], v2, fv2, 4);
-
-  int num_matches = SearchByBoW(desc1, desc2, fv1, fv2, matches12, DESC_TH,
-                                LOWE_RATIO);
-
-  std::cout << "The number of matches between image #" << idx1 << " and image #"
-      << idx2 << " (score = " << best_score << ") is " << num_matches
-      << std::endl;
-
-  // TODO: visualise matches
 
   cout << "Done" << endl;
 }

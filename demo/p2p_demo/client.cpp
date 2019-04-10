@@ -12,7 +12,7 @@
 #include <string>
 
 // DBoW2
-#include "DBoW2.h" // defines OrbVocabulary and OrbDatabase
+#include <DBoW2.h> // defines OrbVocabulary and OrbDatabase
 
 #include <DUtils/DUtils.h>
 #include <DVision/DVision.h>
@@ -154,12 +154,12 @@ int main(int argc, char* argv[]) {
   //vector < vector<cv::Mat> > feats;
   //loadFeatures(feats, videopath);
 
-  testVocCreation(feats, feats, strVocFile);
+  //testVocCreation(feats, feats, strVocFile);
+
+  std::cout << "Finished!" << std::endl;
 
   zmq_close (requester);
   zmq_ctx_destroy (context);
-
-  std::cout << "Finished!" << std::endl;
 
   return EXIT_SUCCESS;
 }
