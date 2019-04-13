@@ -15,6 +15,7 @@
 
 // DBoW2
 #include <DBoW2.h> // defines OrbVocabulary and OrbDatabase
+#include <TemplatedVocabulary.h>
 
 // DLib
 #include <DUtils/DUtils.h>
@@ -114,7 +115,7 @@ int main(int argc, char* argv[]) {
 
   bool bVocLoad = mpVocabulary->loadFromTextFile(strVocFile);
   if (!bVocLoad) {
-    cerr << "Wrong path to vocabulary. " << endl;
+    std::cerr << "Wrong path to vocabulary. " << std::endl;
     cerr << "Falied to open at: " << strVocFile << endl;
     exit(-1);
   }
@@ -137,7 +138,8 @@ int main(int argc, char* argv[]) {
 
 // ----------------------------------------------------------------------------
 
-void loadFeatures(vector<vector<cv::Mat> > &features, std::string videopath) {
+void loadFeatures(vector<vector<cv::Mat> > &features, std::string videopath,
+                  ORBVocabulary* mpVocabulary) {
   cv::VideoCapture cam1(videopath + "%06d.png");
 
   if (!cam1.isOpened()) {
@@ -149,7 +151,8 @@ void loadFeatures(vector<vector<cv::Mat> > &features, std::string videopath) {
   features.clear();
   features.reserve(nFrames);
 
-  cv::Ptr < cv::ORB > orb = cv::ORB::create(2000);
+  OrbDatabase db(mpVocabulary, false, 0); // false = do not use direct index
+  cv::Ptr < cv::ORB > orb = cv::ORB::create(1000);
 
   cout << "Extracting ORB features..." << endl;
   for (int i = 0; i < nFrames; ++i) {
@@ -178,6 +181,8 @@ void loadFeatures(vector<vector<cv::Mat> > &features, std::string videopath) {
 
     features.push_back(vector<cv::Mat>());
     changeStructure(descriptors, features.back());
+
+    db.add(features[i]);
   }
 }
 
@@ -305,4 +310,55 @@ int DescriptorDistance(const cv::Mat &a, const cv::Mat &b) {
 
   return dist;
 }
+
+void CreateDatabase(const vector<vector<vector<float> > > &features,
+                    ORBVocabulary* mpVocabulary)
+{
+  cout << "Creating a small database..." << endl;
+
+  OrbDatabase db(mpVocabulary, false, 0); // false = do not use direct index
+  // (so ignore the last param)
+  // The direct index is useful if we want to retrieve the features that
+  // belong to some vocabulary node.
+  // db creates a copy of the vocabulary, we may get rid of "voc" now
+
+  // add images to the database
+  for(int i = 0; i < NIMAGES; i++)
+  {
+    db.add(features[i]);
+  }
+
+  cout << "... done!" << endl;
+
+  cout << "Database information: " << endl << db << endl;
+
+  // and query the database
+  cout << "Querying the database: " << endl;
+
+  QueryResults ret;
+  for(int i = 0; i < NIMAGES; i++)
+  {
+    db.query(features[i], ret, 4);
+
+    // ret[0] is always the same image in this case, because we added it to the
+    // database. ret[1] is the second best match.
+
+    cout << "Searching for Image " << i << ". " << ret << endl;
+  }
+
+  cout << endl;
+
+  // we can save the database. The created file includes the vocabulary
+  // and the entries added
+  cout << "Saving database..." << endl;
+  db.save("small_db.yml.gz");
+  cout << "... done!" << endl;
+
+  // once saved, we can load it again
+  cout << "Retrieving database once again..." << endl;
+  Surf64Database db2("small_db.yml.gz");
+  cout << "... done! This is: " << endl << db2 << endl;
+}
+
+// ----------------------------------------------------------------------------
 
